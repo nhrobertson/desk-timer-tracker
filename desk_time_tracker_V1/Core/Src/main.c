@@ -1,5 +1,4 @@
-//Adapted by nhrobertson
-
+/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -17,9 +16,65 @@
   ******************************************************************************
   */
 
+/**
+ *
+ * Desk Timer Tracker
+ *
+ * The Desk Timer Tracker is a basic system which will use a mmWave sensor to detect
+ * human presence, monitor how long the person has been present, and display the timer
+ * on a OLED screen. The system will also include a small, FRAM chip which will store and
+ * keep track of the average time spent, which will also be displayed on the OLED screen.
+ *
+ * Requirements:
+ * 	- Low Power System
+ * 	- mmWave activates, signaling a timer to begin incrementing.
+ * 	- OLED monitor displays time on screen, will be off if no presence is detected
+ * 	- once presence is not detected, begin a 5 minute timer to end the session, can be interrupted
+ * 	- once session is ended, store the final time in FRAM
+ * 	- once woken up, update the average in a smaller portion of the screen.
+ *
+ * 	Specifics
+ * 	 - mmWave Sensor
+ * 	 	a. Configurable through a UART communication protocol, see datasheet for specifics (2.2)
+ * 	 	b. Recieves motion detection through serial port, with a lot of information (2.3)
+ * 	 	PINS: [PA9 (Tx), PA10 (Rx)]
+ *
+ * 	 - OLED Screen
+ * 	 	a. 128x64 pixel active area
+ * 	 	b. datasheet is nonexistant...
+ * 	 	c. Need to figure out how to write to screen
+ * 	 	PINS: [PB7 (SCL), PC14 (SDA)]
+ *
+ * 	 - FRAM
+ * 	 	.a Detailed Datasheet
+ * 	 	b. Also uses i2c so will need to figure that out...
+ * 	 	PINS: [PB7 (SCL), PC14 (SDA)]
+ *
+ */
+
+/* USER CODE END Header */
+/* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
 
+/* USER CODE END Includes */
+
+/* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN PTD */
+
+/* USER CODE END PTD */
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+
+/* USER CODE END PD */
+
+/* Private macro -------------------------------------------------------------*/
+/* USER CODE BEGIN PM */
+
+/* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
@@ -31,6 +86,9 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
+/* USER CODE BEGIN PV */
+
+/* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -40,7 +98,14 @@ static void MX_SPI1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
+/* USER CODE BEGIN PFP */
 
+/* USER CODE END PFP */
+
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
+
+/* USER CODE END 0 */
 
 /**
   * @brief  The application entry point.
@@ -84,6 +149,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	//User code go here
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -384,6 +450,14 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(Button_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PA0 PA1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Alternate = GPIO_AF5_TIM1;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LED_Pin */
   GPIO_InitStruct.Pin = LED_Pin;
