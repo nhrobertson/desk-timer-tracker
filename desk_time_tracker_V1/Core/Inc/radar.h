@@ -1,7 +1,7 @@
 #ifndef RADAR_H
 #define RADAR_H
 
-#define BAUD 256000
+#define RADAR_BAUD 256000
 
 //Begin Frame Formats
 #define CONFIG_FRAME_HEADER 0xFDFCFBFA
@@ -10,12 +10,19 @@
 #define DATA_HEADER 0xF4F3F2F1
 #define DATR_END_OF_FRAME 0xF8F7F6F5
 
+typedef struct RADAR_CONFIG {
+
+} RADAR_CONFIG;
+
 enum TARGET_STATE {
 	NO_TARGET,
 	CAMPAIGN_TARGET,
 	STATIONARY_TARGET,
 	DUAL_TARGET
 };
+
+//Configuration
+void Configure_Radar(RADAR_CONFIG cfg);
 
 
 
