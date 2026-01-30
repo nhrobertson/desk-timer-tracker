@@ -62,8 +62,8 @@ all: main-build
 main-build: desk-time-tracker.elf secondary-outputs
 
 # Tool invocations
-desk-time-tracker.elf desk-time-tracker.map: $(OBJS) $(USER_OBJS) /home/noahhr/stm/workspace/desk-timer/desk-time-tracker/STM32C011F6UX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "desk-time-tracker.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m0plus -T"/home/noahhr/stm/workspace/desk-timer/desk-time-tracker/STM32C011F6UX_FLASH.ld" --specs=nosys.specs -Wl,-Map="desk-time-tracker.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+desk-time-tracker.elf desk-time-tracker.map: $(OBJS) $(USER_OBJS) C:\Users\nhrob\embedded\desk-timer-tracker\desk-time-tracker\STM32C011F6UX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "desk-time-tracker.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m0plus -T"C:\Users\nhrob\embedded\desk-timer-tracker\desk-time-tracker\STM32C011F6UX_FLASH.ld" --specs=nosys.specs -Wl,-Map="desk-time-tracker.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

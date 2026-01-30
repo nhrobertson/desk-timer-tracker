@@ -4,6 +4,8 @@
 "./Core/Src/syscalls.o"
 "./Core/Src/sysmem.o"
 "./Core/Src/system_stm32c0xx.o"
+"./Core/Src/uprint.o"
+"./Core/Src/util.o"
 "./Core/Startup/startup_stm32c011f6ux.o"
 "./Drivers/MMWAVE/mmwave.o"
 "./Drivers/SSD1306/ssd1306.o"

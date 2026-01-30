@@ -1,0 +1,6 @@
+../Core/Src/uprint.c:10:6:uputc	1
+../Core/Src/uprint.c:14:6:uputs	1
+../Core/Src/uprint.c:18:13:uprint_int	6
+../Core/Src/uprint.c:45:13:uprint_hex	4
+../Core/Src/uprint.c:67:13:uprint_double	3
+../Core/Src/uprint.c:95:6:uprintf	7
