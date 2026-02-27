@@ -8,7 +8,7 @@
 
 
 void uputc(char c) {
-	HAL_UART_Transmit(&huart2, (uint8_t*)c, 1, HAL_MAX_DELAY);
+	HAL_UART_Transmit(&huart2, (uint8_t*)&c, 1, HAL_MAX_DELAY);
 }
 
 void uputs(char* str) {

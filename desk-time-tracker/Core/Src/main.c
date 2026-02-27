@@ -115,7 +115,6 @@ int main(void)
   ssd1306_Init();
   ssd1306_Fill(White);
   ssd1306_UpdateScreen();
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -135,7 +134,6 @@ int main(void)
 	ssd1306_UpdateScreen();
 	for(int i = 0; i < 1000000; ++i);
 	uprintf("Val: %d", state);
-
   }
   /* USER CODE END 3 */
 }
