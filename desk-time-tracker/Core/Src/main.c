@@ -115,6 +115,15 @@ int main(void)
   ssd1306_Init();
   ssd1306_Fill(White);
   ssd1306_UpdateScreen();
+
+  if (mmwave_Init(&huart1) != 0) {
+	ssd1306_Fill(White);
+	ssd1306_UpdateScreen();
+	HAL_Delay(500);
+	ssd1306_Fill(Black);
+	ssd1306_UpdateScreen();
+	HAL_Delay(500);
+  }
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -124,16 +133,46 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	int state = mmwave_Recieve(huart1);
+	int state = mmwave_Recieve(&huart1);
 	char str_buf[16];
 	sprintf(str_buf, "Val: %d", state);
+//
+//	ssd1306_SetCursor(8, 16);
+//	ssd1306_Fill(White);
+//	ssd1306_WriteString(str_buf, Font_16x24, Black);
+//	ssd1306_UpdateScreen();
+//	for(int i = 0; i < 1000000; ++i);
+//	uprintf("Val: %d", state);
+//	HAL_Delay(100);
 
-	ssd1306_SetCursor(8, 16);
-	ssd1306_Fill(White);
-	ssd1306_WriteString(str_buf, Font_16x24, Black);
-	ssd1306_UpdateScreen();
-	for(int i = 0; i < 1000000; ++i);
-	uprintf("Val: %d", state);
+	char full_str[64];
+	sprintf(full_str, "Val: %d", state);
+	int text_len = strlen(full_str);
+	int screen_chars = 7; // 128px / 16px per char (starting at x=8)
+
+	// Scroll in from right
+	for (int offset = screen_chars; offset >= 0; offset--) {
+	    sprintf(str_buf, "%*s%s", offset, "", full_str);
+	    ssd1306_SetCursor(8, 16);
+	    ssd1306_Fill(White);
+	    ssd1306_WriteString(str_buf, Font_16x24, Black);
+	    ssd1306_UpdateScreen();
+	    HAL_Delay(50);
+	}
+
+	HAL_Delay(500); // Hold on screen
+	state = mmwave_Recieve(&huart1);
+	sprintf(str_buf, "Val: %d", state);
+
+	// Scroll off to left
+	for (int offset = 1; offset <= text_len + 1; offset++) {
+	    sprintf(str_buf, "%s", full_str + offset);
+	    ssd1306_SetCursor(8, 16);
+	    ssd1306_Fill(White);
+	    ssd1306_WriteString(str_buf, Font_16x24, Black);
+	    ssd1306_UpdateScreen();
+	    HAL_Delay(50);
+	}
   }
   /* USER CODE END 3 */
 }

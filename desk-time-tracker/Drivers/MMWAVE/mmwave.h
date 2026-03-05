@@ -17,6 +17,8 @@
 
 #define BUFFER_SIZE 23 //The size of a data frame in default mode
 
+#define MASK(pos) (1UL << pos)
+
 
 //Configuration
 
@@ -37,6 +39,7 @@
 #define MMWAVE_DISTANCE_RESOLUTION_CW 0x00AA
 //Command Value -> 2 byte distance resolution selection index (0x0000 -> 0.75m, 0x0001 -> 0.2m (but fd is 0x0001 which is 0.75m))
 
+#define PADDING 10
 
 #define HEADER_SEQUENCE 0xF4F3F2F1
 //Header
@@ -46,11 +49,11 @@
 //0xF8F7F6F5
 
 typedef struct {
-	uint8_t header;
-	uint8_t data_len;
-	uint8_t cmd_word;
-	uint8_t cmd_value[20];
-	uint8_t footer;
+	uint32_t header;
+	uint16_t data_len;
+	uint16_t cmd_word;
+	uint8_t cmd_value[32];
+	uint32_t footer;
 } mmwave_Packet;
 
 typedef struct {
@@ -60,9 +63,9 @@ typedef struct {
 
 extern mmwave_Data_t mmwave_Data;
 
-void mmwave_Write_Command(mmwave_Packet packet, UART_HandleTypeDef huart1);
-void mmwave_Init(UART_HandleTypeDef huart1);
-int mmwave_Recieve(UART_HandleTypeDef huart1);
+void mmwave_Write_Command(mmwave_Packet* packet, UART_HandleTypeDef* huart1);
+int mmwave_Init(UART_HandleTypeDef* huart1);
+int mmwave_Recieve(UART_HandleTypeDef* huart1);
 int mmwave_Parse();
 
 
