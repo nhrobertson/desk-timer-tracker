@@ -149,28 +149,32 @@ void Display_SettingsScreen(uint8_t hours, uint8_t minutes, uint8_t selected_pos
 
     ssd1306_Fill(White);
 
-    // -- "SET" label top-left ---------------------------------
-    ssd1306_SetCursor(2, 4);
-    ssd1306_WriteString("SET", Font_6x8, Black);
+    // -- "BUZZ" label centered top ----------------------------
+    // Font_6x8: "BUZZ" = 4 chars x 6px = 24px, centered at x=52
+    ssd1306_SetCursor(52, 2);
+    ssd1306_WriteString("BUZZ", Font_6x8, Black);
+
+    // -- Centered time layout ---------------------------------
+    // Font_16x26: "HH:MM" = 5 chars x 16px = 80px
+    // Center on 128px screen: (128 - 80) / 2 = 24
+    // So: HH @ x=24, ':' @ x=56, MM @ x=72
+    // Vertically centered: (64 - 26) / 2 = 19
 
     // -- Colon always visible ---------------------------------
-    ssd1306_SetCursor(34, 19);
+    ssd1306_SetCursor(56, 19);
     ssd1306_WriteString(":", Font_16x26, Black);
 
-    // -- Hours: flash if selected, else always draw -----------
+    // -- Hours: flash if selected -----------------------------
     if (selected_pos != 1 || blink_on) {
-        ssd1306_SetCursor(2, 19);
+        ssd1306_SetCursor(24, 19);
         ssd1306_WriteString(hours_str, Font_16x26, Black);
     }
 
-    // -- Minutes: flash if selected, else always draw ---------
+    // -- Minutes: flash if selected ---------------------------
     if (selected_pos != 0 || blink_on) {
-        ssd1306_SetCursor(50, 19);
+        ssd1306_SetCursor(72, 19);
         ssd1306_WriteString(mins_str, Font_16x26, Black);
     }
-
-    // -- Vertical bar on right edge ---------------------------
-    ssd1306_FillRectangle(124, 0, 127, 63, Black);
 
     ssd1306_UpdateScreen();
 }
