@@ -30,15 +30,29 @@ char nibbleToChar(uint8_t nib) {
 }
 
 void timestampToChar(char* str, int32_t timestamp) {
+  
+  uint8_t hours = 0;
+  uint8_t minutes = 0;
+
+  getHoursMins(&hours, &minutes, (uint32_t)timestamp);
+
+  sprintf(str, "%02d:%02d", hours, minutes);
+}
+
+void getHoursMins(uint8_t* hours8b, uint8_t* mins8b, uint32_t timestamp) {
   int32_t minutes = timestamp / 60;
   int32_t hours = minutes / 60;
-
-  while (minutes >= 60) {
-    minutes -= 60;
-  }
+  
+  minutes = minutes % 60;
 
   if (hours > 99) {
     hours = 0;
   }
-  sprintf(str, "%02d:%02d", hours, minutes);
+  
+  *hours8b = ((uint8_t)hours);
+  *mins8b  = ((uint8_t)minutes);
+}
+
+uint32_t hoursMinsToTimestamp(uint8_t hours, uint8_t minutes) {
+  return (hours*60 + minutes) * 60;
 }

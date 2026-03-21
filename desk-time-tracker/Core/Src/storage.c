@@ -9,8 +9,8 @@
 
 int __load_fromFlash(uint32_t* averages, uint32_t* beeper) {
   if (stored_avgs[0] != 0xFFFFFFFF) {
-    memcpy(averages, stored_avgs, sizeof(averages));
-    memcpy(beeper, (const uint32_t *)BEEPER_STORAGE_ADDR, sizeof(beeper));
+	  memcpy(averages, stored_avgs, AVERAGE_COUNT * sizeof(uint32_t));  // 256 bytes
+	  memcpy(beeper, (const uint32_t *)BEEPER_STORAGE_ADDR, sizeof(uint32_t));
     return 1;
   }
   return 0;
@@ -42,7 +42,7 @@ HAL_StatusTypeDef __flash_store(uint32_t* averages, uint32_t count, uint32_t* be
     addr += 8; //Increment address by 8
   }
   
-  status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, addr, (uint64_t)beeper);
+  status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, addr, (uint64_t)(*beeper));
 
   HAL_FLASH_Lock();
   return status;

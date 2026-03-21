@@ -13,7 +13,7 @@
 
 
 #define STORAGE_ADDR 0x8007800
-#define STORAGE_OFFSET 256
+#define STORAGE_OFFSET 0
 
 #define STORAGE_START_ADDR (STORAGE_ADDR + STORAGE_OFFSET * sizeof(uint32_t)) //Add a 64 byte offset
 #define AVERAGE_COUNT 64

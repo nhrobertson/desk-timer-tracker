@@ -65,7 +65,14 @@ void Error_Handler(void);
 #define INFRARED_EXTI_IRQn EXTI4_15_IRQn
 
 /* USER CODE BEGIN Private defines */
-
+typedef enum {
+  JOY_SELECT,
+  JOY_RIGHT,
+  JOY_LEFT,
+  JOY_UP,
+  JOY_DOWN,
+  JOY_NONE
+} JoystickDirection;
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

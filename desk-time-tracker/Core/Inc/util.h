@@ -18,5 +18,6 @@
 char nibbleToChar(uint8_t nib);
 
 void timestampToChar(char* str, int32_t timestamp);
+void getHoursMins(uint8_t* hours, uint8_t* mins, uint32_t timestamp);
 
 #endif /* INC_UTIL_H_ */
