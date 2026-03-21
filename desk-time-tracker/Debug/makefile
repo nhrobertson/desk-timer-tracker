@@ -11,7 +11,6 @@ RM := rm -rf
 -include sources.mk
 -include Drivers/STM32C0xx_HAL_Driver/Src/subdir.mk
 -include Drivers/SSD1306/subdir.mk
--include Drivers/MMWAVE/subdir.mk
 -include Core/Startup/subdir.mk
 -include Core/Src/subdir.mk
 -include objects.mk

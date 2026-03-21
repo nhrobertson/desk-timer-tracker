@@ -28,3 +28,17 @@ char nibbleToChar(uint8_t nib) {
         default:  return '?';  // should never happen
     }
 }
+
+void timestampToChar(char* str, int32_t timestamp) {
+  int32_t minutes = timestamp / 60;
+  int32_t hours = minutes / 60;
+
+  while (minutes >= 60) {
+    minutes -= 60;
+  }
+
+  if (hours > 99) {
+    hours = 0;
+  }
+  sprintf(str, "%02d:%02d", hours, minutes);
+}

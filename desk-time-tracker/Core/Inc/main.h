@@ -36,12 +36,13 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
+#define DMA_BUF_SIZE 256
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-extern UART_HandleTypeDef huart2;
+
+
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/

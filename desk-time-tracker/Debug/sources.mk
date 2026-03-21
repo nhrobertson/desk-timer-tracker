@@ -24,7 +24,6 @@ C_DEPS :=
 SUBDIRS := \
 Core/Src \
 Core/Startup \
-Drivers/MMWAVE \
 Drivers/SSD1306 \
 Drivers/STM32C0xx_HAL_Driver/Src \
 

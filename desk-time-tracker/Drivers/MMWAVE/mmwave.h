@@ -12,6 +12,8 @@
 #include "stm32c0xx_hal.h"
 
 #define BAUD_RATE 256000 //1 stop bit, no parity
+#define DMA_BUF_SIZE 256
+
 
 #define MMWAVE_UART_PORT huart1
 
@@ -25,8 +27,8 @@
 //Send command protocol
 //Frame Header | 2 byte intra-frame data length | Intra-frame data | End of frame
 
-#define MMWAVE_CONFIG_HEADER 0xFDFCFBFA
-#define MMWAVE_CONFIG_FOOTER 0x04030201
+#define MMWAVE_CONFIG_HEADER 0xFAFBFCFD
+#define MMWAVE_CONFIG_FOOTER 0x01020304
 
 #define MMWAVE_ENABLE_CONFIG_CW 0x00FF
 #define MMWAVE_ENABLE_CONFIG_CV 0x0001
@@ -58,15 +60,18 @@ typedef struct {
 
 typedef struct {
     uint8_t state; //0 - None, 1 - Campaign, 2 - Stationary, 3 - Both, any other is Invalid
+    uint16_t distance;
     uint8_t buf[BUFFER_SIZE];
 } mmwave_Data_t;
 
 extern mmwave_Data_t mmwave_Data;
+extern uint8_t dma_rx_buf[DMA_BUF_SIZE];
+extern uint16_t last_pos;
 
-void mmwave_Write_Command(mmwave_Packet* packet, UART_HandleTypeDef* huart1);
-int mmwave_Init(UART_HandleTypeDef* huart1);
-int mmwave_Recieve(UART_HandleTypeDef* huart1);
-int mmwave_Parse();
+//void mmwave_Write_Command(mmwave_Packet* packet, UART_HandleTypeDef* huart1);
+//int mmwave_Init(UART_HandleTypeDef* huart1);
+//int mmwave_Receive(UART_HandleTypeDef* huart1);
+//int mmwave_Parse();
 
 
 #endif /* MMWAVE_MMWAVE_H_ */

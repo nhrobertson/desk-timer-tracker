@@ -1,1 +1,2 @@
 ../Core/Src/util.c:10:6:nibbleToChar	17
+../Core/Src/util.c:32:6:timestampToChar	3

@@ -20,6 +20,10 @@ Core/Src/uprint.o: ../Core/Src/uprint.c ../Core/Inc/uprint.h \
  ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_dma.h \
  ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_dma_ex.h \
  ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_cortex.h \
+ ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_adc.h \
+ ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_ll_adc.h \
+ ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_adc_ex.h \
+ ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_adc_ex.h \
  ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_exti.h \
  ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_flash.h \
  ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_flash_ex.h \
@@ -31,8 +35,6 @@ Core/Src/uprint.o: ../Core/Src/uprint.c ../Core/Inc/uprint.h \
  ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_rtc_ex.h \
  ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_tim.h \
  ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_tim_ex.h \
- ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_uart.h \
- ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_uart_ex.h \
  ../Core/Inc/util.h ../Core/Inc/main.h
 ../Core/Inc/uprint.h:
 ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal.h:
@@ -56,6 +58,10 @@ Core/Src/uprint.o: ../Core/Src/uprint.c ../Core/Inc/uprint.h \
 ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_dma.h:
 ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_dma_ex.h:
 ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_cortex.h:
+../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_adc.h:
+../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_ll_adc.h:
+../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_adc_ex.h:
+../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_adc_ex.h:
 ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_exti.h:
 ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_flash.h:
 ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_flash_ex.h:
@@ -67,7 +73,5 @@ Core/Src/uprint.o: ../Core/Src/uprint.c ../Core/Inc/uprint.h \
 ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_rtc_ex.h:
 ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_tim.h:
 ../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_tim_ex.h:
-../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_uart.h:
-../Drivers/STM32C0xx_HAL_Driver/Inc/stm32c0xx_hal_uart_ex.h:
 ../Core/Inc/util.h:
 ../Core/Inc/main.h:

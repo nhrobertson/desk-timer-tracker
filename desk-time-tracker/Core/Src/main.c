@@ -22,10 +22,12 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+#include <stdint.h>
 #include "ssd1306.h"
 #include "ssd1306_fonts.h"
 #include "mmwave.h"
 #include "uprint.h"
+#include "storage.h"
 
 /* USER CODE END Includes */
 
@@ -45,6 +47,7 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
 
 I2C_HandleTypeDef hi2c1;
 
@@ -52,10 +55,27 @@ RTC_HandleTypeDef hrtc;
 
 TIM_HandleTypeDef htim1;
 
-UART_HandleTypeDef huart1;
-UART_HandleTypeDef huart2;
-
 /* USER CODE BEGIN PV */
+
+volatile uint8_t movement_state = 0;
+volatile int32_t timestamp      = 0; //global timer, updated only in Timer execution
+volatile uint8_t resumeFromStop = 0;
+
+uint32_t beeper = 3 * 60 * 60; //Three Hour Default
+
+struct averages {
+  uint8_t average_iter;
+  uint16_t average_count;
+  uint32_t averages[64];
+};
+
+uint8_t oled_state              = 0;
+
+struct session {
+  uint8_t state;
+  uint8_t ab_tim_begun;
+  int32_t ab_timestampe;
+};
 
 /* USER CODE END PV */
 
@@ -63,17 +83,122 @@ UART_HandleTypeDef huart2;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
-static void MX_USART1_UART_Init(void);
 static void MX_RTC_Init(void);
 static void MX_TIM1_Init(void);
-static void MX_USART2_UART_Init(void);
+static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
+
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+void Display_TimeScreen(char *current_time, char *avg_time)
+{
+    ssd1306_Fill(White);
+
+    // ── Large current time ──────────────────────────────
+    // Font_16x26: each char is 16px wide, 26px tall
+    // Vertically centered: (64 - 26) / 2 = 19
+    ssd1306_SetCursor(2, 19);
+    ssd1306_WriteString(current_time, Font_16x26, Black);
+
+    // ── AVG label (top-right) ───────────────────────────
+    // Reserve rightmost 4px for the bar, so AVG sits at ~x=88
+    ssd1306_SetCursor(88, 4);
+    ssd1306_WriteString("AVG", Font_6x8, Black);
+
+    // ── Average time (under AVG label) ─────────────────
+    ssd1306_SetCursor(88, 14);
+    ssd1306_WriteString(avg_time, Font_6x8, Black);
+
+    // ── Vertical bar on right edge ──────────────────────
+    // 4px wide bar flush to the right
+    ssd1306_FillRectangle(124, 0, 127, 63, Black);
+
+    ssd1306_UpdateScreen();
+}
+
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+  //Update global time
+  timestamp++;
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+  if (GPIO_Pin == GPIO_PIN_12) {
+    //If coming from low power mode - wakeup
+    if (resumeFromStop) {
+      SystemClock_Config();
+      HAL_ResumeTick();
+    }
+    //Infared sensor
+    movement_state = 1;
+  }
+}
+
+void handle_movement() {
+  session.state = 1;
+  session.ab_tim_begun = 0;
+  session.ab_timestampe = 0;
+
+  if (!movement_state) {
+    movement_state = 1;
+  }
+
+  if (!oled_state) {
+    ssd1306_SetDisplayOn(1);
+    ssd1306_Fill(White);
+    ssd1306_UpdateScreen();
+    oled_state = 1;
+  }
+  
+  if (timestamp % 60 == 1) {
+    //Convert Current Timestamp to something usable on screen
+    timestampToChar(timestamp_str, timestamp);
+  
+    //Display Everything on screen
+    Display_TimeScreen(timestamp_str, avg_str);
+  }
+}
+
+void handle_absence() {
+  if (oled_state) {
+    ssd1306_Fill(Black);
+    ssd1306_UpdateScreen();
+    ssd1306_SetDisplayOn(0);
+    oled_state = 0;
+  }
+
+  if (session.state) {
+    //Begin Countdown
+    if (session.ab_tim_begun) {
+      if (session.ab_timestampe <= timestamp + 360) {
+        //5 Min Absensence, Enter Low Power Mode
+        session.state = 0;
+        session.ab_timestampe = 0;
+        session.ab_tim_begun = 0;
+        timestamp = 0;
+
+        //Store Average
+        if (__flash_store(&averages.averages, averages.average_count, &beeper) != HAL_OK) {
+          //Broken
+          while(1);
+        }
+
+        //Enter Low Power Mode
+        resumeFromStop = 1;
+        HAL_SuspendTick();
+        HAL_PWR_EnterSTOPMode(PWR_MAINREGULATOR_ON, PWR_STOPENTRY_WFI);
+        resumeFromStop = 0;
+      }
+    } else {
+      session.ab_tim_begun = 1;
+      session.ab_timestampe = timestamp;
+    }
+  }
+}
 /* USER CODE END 0 */
 
 /**
@@ -84,6 +209,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+  
 
   /* USER CODE END 1 */
 
@@ -106,23 +232,56 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C1_Init();
-  MX_USART1_UART_Init();
   MX_RTC_Init();
   MX_TIM1_Init();
-  MX_USART2_UART_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
+
+  /**TODO: 
+  Start up -
+  Iniatalize
+   - Screen
+   - Load Average
+   - Load Buffer Time
+   - Timer
+  **/
+
+  //Timer
+  // f_out = APB2 / (ARR + 1) -> 12Mhz / (999 + 1) -> 12Khz / (11999 + 1) = 1 Hz 
+  //Initalized in MX_TIM1_Init
+  HAL_TIM_Base_Start_IT(&htim1);
+
   //Turn On Screen
   ssd1306_Init();
-  ssd1306_Fill(White);
-  ssd1306_UpdateScreen();
 
-  if (mmwave_Init(&huart1) != 0) {
-	ssd1306_Fill(White);
-	ssd1306_UpdateScreen();
-	HAL_Delay(500);
-	ssd1306_Fill(Black);
-	ssd1306_UpdateScreen();
-	HAL_Delay(500);
+  if (!oled_state) {
+    ssd1306_SetDisplayOn(1);
+    ssd1306_Fill(White);
+    ssd1306_UpdateScreen();
+    oled_state = 1;
+  }
+
+  //Load Average 
+  
+
+  //Load Buffer Time
+  
+
+  //Set String used to be updated for display
+
+  char timestamp_str[6];
+  char avg_str[6];
+
+
+  
+  struct session session;
+  struct averages averages;
+  
+  if (__load_fromFlash(&averages.averages, &beeper) == 0) {
+	  //Failed to Load Averages
+	  sprintf(avg_str, "00:00");
+  } else {
+	  timestampToChar(avg_str, averages.averages[0]);
   }
   /* USER CODE END 2 */
 
@@ -133,46 +292,19 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	int state = mmwave_Recieve(&huart1);
-	char str_buf[16];
-	sprintf(str_buf, "Val: %d", state);
-//
-//	ssd1306_SetCursor(8, 16);
-//	ssd1306_Fill(White);
-//	ssd1306_WriteString(str_buf, Font_16x24, Black);
-//	ssd1306_UpdateScreen();
-//	for(int i = 0; i < 1000000; ++i);
-//	uprintf("Val: %d", state);
-//	HAL_Delay(100);
+    //Simulate State until Infared Sensor comes in
+    movement_state = 1;
 
-	char full_str[64];
-	sprintf(full_str, "Val: %d", state);
-	int text_len = strlen(full_str);
-	int screen_chars = 7; // 128px / 16px per char (starting at x=8)
+    oled_state = ssd1306_GetDisplayOn();
 
-	// Scroll in from right
-	for (int offset = screen_chars; offset >= 0; offset--) {
-	    sprintf(str_buf, "%*s%s", offset, "", full_str);
-	    ssd1306_SetCursor(8, 16);
-	    ssd1306_Fill(White);
-	    ssd1306_WriteString(str_buf, Font_16x24, Black);
-	    ssd1306_UpdateScreen();
-	    HAL_Delay(50);
-	}
 
-	HAL_Delay(500); // Hold on screen
-	state = mmwave_Recieve(&huart1);
-	sprintf(str_buf, "Val: %d", state);
-
-	// Scroll off to left
-	for (int offset = 1; offset <= text_len + 1; offset++) {
-	    sprintf(str_buf, "%s", full_str + offset);
-	    ssd1306_SetCursor(8, 16);
-	    ssd1306_Fill(White);
-	    ssd1306_WriteString(str_buf, Font_16x24, Black);
-	    ssd1306_UpdateScreen();
-	    HAL_Delay(50);
-	}
+    if (movement_state) {
+      handle_movement();
+    } else {
+      handle_absence();
+    }
+  
+    HAL_Delay(50);
   }
   /* USER CODE END 3 */
 }
@@ -214,6 +346,63 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV1;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.ScanConvMode = ADC_SCAN_SEQ_FIXED;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc1.Init.LowPowerAutoWait = DISABLE;
+  hadc1.Init.LowPowerAutoPowerOff = DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc1.Init.SamplingTimeCommon1 = ADC_SAMPLETIME_1CYCLE_5;
+  hadc1.Init.OversamplingMode = DISABLE;
+  hadc1.Init.TriggerFrequencyMode = ADC_TRIGGER_FREQ_HIGH;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_8;
+  sConfig.Rank = ADC_RANK_CHANNEL_NUMBER;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -321,9 +510,9 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 0;
+  htim1.Init.Prescaler = 999;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 65535;
+  htim1.Init.Period = 11999;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -356,96 +545,13 @@ static void MX_TIM1_Init(void)
 }
 
 /**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART1_Init 0 */
-
-  /* USER CODE END USART1_Init 0 */
-
-  /* USER CODE BEGIN USART1_Init 1 */
-
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 256000;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_DisableFifoMode(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
-
-  /* USER CODE END USART1_Init 2 */
-
-}
-
-/**
-  * @brief USART2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART2_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART2_Init 0 */
-
-  /* USER CODE END USART2_Init 0 */
-
-  /* USER CODE BEGIN USART2_Init 1 */
-
-  /* USER CODE END USART2_Init 1 */
-  huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
-  huart2.Init.WordLength = UART_WORDLENGTH_8B;
-  huart2.Init.StopBits = UART_STOPBITS_1;
-  huart2.Init.Parity = UART_PARITY_NONE;
-  huart2.Init.Mode = UART_MODE_TX_RX;
-  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart2.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART2_Init 2 */
-
-  /* USER CODE END USART2_Init 2 */
-
-}
-
-/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
   /* USER CODE BEGIN MX_GPIO_Init_1 */
 
   /* USER CODE END MX_GPIO_Init_1 */
@@ -454,6 +560,16 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
+
+  /*Configure GPIO pin : PA12 */
+  GPIO_InitStruct.Pin = GPIO_PIN_12;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI4_15_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -490,7 +606,6 @@ void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */

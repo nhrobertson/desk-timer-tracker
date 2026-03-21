@@ -10,6 +10,26 @@
 mmwave_Data_t mmwave_Data;
 uint8_t tx_buff[32];
 
+uint8_t dma_rx_buf[DMA_BUF_SIZE];
+uint16_t last_pos;
+
+#define MMWAVE_MAX_RETRIES 3
+
+static int mmwave_Send_With_Retry(mmwave_Packet* packet, UART_HandleTypeDef* huart) {
+    uint8_t flush;
+    for (int attempt = 0; attempt < MMWAVE_MAX_RETRIES; attempt++) {
+        // Flush any stale data before each attempt
+        while(HAL_UART_Receive(huart, &flush, 1, 10) == HAL_OK);
+
+        mmwave_Write_Command(packet, huart);
+        int ack = mmwave_Check_For_Ack(huart);
+        if (ack == 0) return 0;
+
+        HAL_Delay(50); // Wait before retrying
+    }
+    return 1; // All retries failed
+}
+
 void mmwave_Write_Command(mmwave_Packet* packet, UART_HandleTypeDef* huart1) {
 
 	//Setup Header
@@ -39,7 +59,8 @@ void mmwave_Write_Command(mmwave_Packet* packet, UART_HandleTypeDef* huart1) {
 }
 
 int mmwave_Check_For_Ack(UART_HandleTypeDef* huart1) {
-	if(HAL_UART_Receive(huart1, mmwave_Data.buf, 32, 1000)==HAL_OK) {
+	uint16_t data_len = 0;
+	if(HAL_UART_Receive(huart1, mmwave_Data.buf, 6, 1000)==HAL_OK) {
 		//Check for success.
 		uint32_t header = (mmwave_Data.buf[3] << 24)
 		                + (mmwave_Data.buf[2] << 16)
@@ -49,21 +70,30 @@ int mmwave_Check_For_Ack(UART_HandleTypeDef* huart1) {
 		if (header != MMWAVE_CONFIG_HEADER) {
 			return 1;
 		}
+		data_len = (mmwave_Data.buf[5] << 8) + (mmwave_Data.buf[4]);
+	} else {
+		return 2;
+	}
 
-		uint16_t data_len = (mmwave_Data.buf[5] << 8) + (mmwave_Data.buf[4]);
-		uint16_t sent_cmd = (mmwave_Data.buf[7] << 8) + (mmwave_Data.buf[6]);
-		uint16_t ack      = (mmwave_Data.buf[9] << 8) + (mmwave_Data.buf[8]);
+	if(HAL_UART_Receive(huart1, mmwave_Data.buf, data_len + 4, 1000)==HAL_OK) {
+		uint16_t sent_cmd = (mmwave_Data.buf[1] << 8) + (mmwave_Data.buf[0]);
+		uint16_t ack      = (mmwave_Data.buf[3] << 8) + (mmwave_Data.buf[2]);
 		if (ack == 0) {
 			return 0;
 		} else {
 			return 1;
 		}
 	} else {
-		return 1;
+		return 2;
 	}
 }
 
 int mmwave_Init(UART_HandleTypeDef* huart1) {
+    // Flush any stale data frames sitting in RX buffer
+    uint8_t flush;
+    while(HAL_UART_Receive(huart1, &flush, 1, 10) == HAL_OK)
+    	;
+
 	mmwave_Packet cmd_packet;
 	cmd_packet.header = MMWAVE_CONFIG_HEADER;
 	cmd_packet.footer = MMWAVE_CONFIG_FOOTER;
@@ -74,11 +104,30 @@ int mmwave_Init(UART_HandleTypeDef* huart1) {
 	cmd_packet.cmd_value[0] = 0x01;
 	cmd_packet.cmd_value[1] = 0x00;
 
+	if (mmwave_Send_With_Retry(&cmd_packet, huart1) > 0) return 1;
+	HAL_Delay(10);
+
+	//Reset to Factory Defaults
+	cmd_packet.cmd_word = 0x00A2;
+	cmd_packet.data_len = 0x0002;
+	if (mmwave_Send_With_Retry(&cmd_packet, huart1) > 0) return 1;
+	HAL_Delay(50);
+
+	// Restart to apply factory reset
+	// Use plain transmit — NOT Send_With_Retry
+	// Send_With_Retry flushes RX which will eat streaming frames
+	cmd_packet.cmd_word = 0x00A3;
+	cmd_packet.data_len = 0x0002;
 	mmwave_Write_Command(&cmd_packet, huart1);
-	if (mmwave_Check_For_Ack(huart1) > 0) {
-		//Err
-		return 1;
-	}
+	HAL_Delay(1500); // sensor reboots, comes up at 256000 in working mode
+
+	// Enable config again
+	cmd_packet.cmd_word = 0x00FF;
+	cmd_packet.data_len = 0x0004;
+	cmd_packet.cmd_value[0] = 0x01;
+	cmd_packet.cmd_value[1] = 0x00;
+	mmwave_Send_With_Retry(&cmd_packet, huart1);
+	HAL_Delay(50);
 
 	//Set distance resolution to 0.2m
 	cmd_packet.data_len = 0x0004;
@@ -86,11 +135,8 @@ int mmwave_Init(UART_HandleTypeDef* huart1) {
 	cmd_packet.cmd_value[0] = 0x01; //maybe 0.2m? Isn't really clear....
 	cmd_packet.cmd_value[1] = 0x00;
 
-	mmwave_Write_Command(&cmd_packet, huart1);
-	if (mmwave_Check_For_Ack(huart1) > 0) {
-		//Err
-		return 1;
-	}
+	if (mmwave_Send_With_Retry(&cmd_packet, huart1) > 0) return 1;
+	HAL_Delay(10);
 
 	//Set maximum movement distance door, maximum resting, and no one duration
 	cmd_packet.data_len = 0x0014;
@@ -114,54 +160,62 @@ int mmwave_Init(UART_HandleTypeDef* huart1) {
 	cmd_packet.cmd_value[16] = 0x00;
 	cmd_packet.cmd_value[17] = 0x00;
 
+	if (mmwave_Send_With_Retry(&cmd_packet, huart1) > 0) return 1;
+	HAL_Delay(10);
+
+
+	// Restart module
+	cmd_packet.data_len = 0x0002;
+	cmd_packet.cmd_word = 0x00A3;
 	mmwave_Write_Command(&cmd_packet, huart1);
-	if (mmwave_Check_For_Ack(huart1) > 0) {
-		//Err
-		return 1;
-	}
+
+	HAL_Delay(1000); // Give it time to reboot and start streaming
 
 
+	// Enable config again
+	cmd_packet.cmd_word = 0x00FF;
+	cmd_packet.data_len = 0x0004;
+	cmd_packet.cmd_value[0] = 0x01;
+	cmd_packet.cmd_value[1] = 0x00;
+	mmwave_Send_With_Retry(&cmd_packet, huart1);
+	HAL_Delay(50);
 
 	//End configuration
 	cmd_packet.data_len = 0x0002;
 	cmd_packet.cmd_word = 0x00FE;
-	mmwave_Write_Command(&cmd_packet, huart1);
-	if (mmwave_Check_For_Ack(huart1) > 0) {
-		//Err
-		return 1;
-	}
+	if (mmwave_Send_With_Retry(&cmd_packet, huart1) > 0) return 1;
+	HAL_Delay(10);
+
+
+
 	return 0;
 }
 
-int mmwave_Recieve(UART_HandleTypeDef* huart1) {
-	//Need to intakes data seeing that 0xF4F3F2F1 is the headers
-	//Next 2 bytes is the length n
-	//n bytes to parse (with the first two denoting the state)
-	//Final Sequence of 0xF8F7F6F5
+int mmwave_Receive(UART_HandleTypeDef *huart) {
+    uint16_t cur_pos = DMA_BUF_SIZE - __HAL_DMA_GET_COUNTER(huart->hdmarx);
 
-	if(HAL_UART_Receive(huart1, mmwave_Data.buf, 23, 1000)==HAL_OK) {
-		//Recieved a buffer of 64 bytes
-		uint32_t temp = 0;
-		for (int i = 0; i < 4; ++i) {
-			temp = (temp << 8) | mmwave_Data.buf[i];
-		}
-		if (temp == HEADER_SEQUENCE ) {
-			//Recieved correct header sequence, parse data
-			int ret = mmwave_Parse();
-			return ret;
-		} else {
-			//Invalid Header Sequence, skip data frame
+    while (last_pos != cur_pos) {
+        uint16_t i = last_pos;
+        // Check for frame header F4 F3 F2 F1
+        if (dma_rx_buf[i % DMA_BUF_SIZE]       == 0xF4 &&
+            dma_rx_buf[(i+1) % DMA_BUF_SIZE]   == 0xF3 &&
+            dma_rx_buf[(i+2) % DMA_BUF_SIZE]   == 0xF2 &&
+            dma_rx_buf[(i+3) % DMA_BUF_SIZE]   == 0xF1) {
 
-			//TODO: Error Handling
-			return -1;
-		}
-	} else {
-		return -1;
-	}
+            // Make sure full 23-byte frame is available
+            uint16_t available = (cur_pos - i + DMA_BUF_SIZE) % DMA_BUF_SIZE;
+            if (available < 23) return -1; // wait for more data
+
+            uint8_t frame[23];
+            for (int j = 0; j < 23; j++)
+                frame[j] = dma_rx_buf[(i + j) % DMA_BUF_SIZE];
+
+            mmwave_Data.state    = frame[8];
+            mmwave_Data.distance = frame[15] | (frame[16] << 8);
+            last_pos = (i + 23) % DMA_BUF_SIZE;
+            return mmwave_Data.state;
+        }
+        last_pos = (last_pos + 1) % DMA_BUF_SIZE;
+    }
+    return -1; // no complete frame yet
 }
-
-int mmwave_Parse() {
-	mmwave_Data.state = mmwave_Data.buf[6];
-	return mmwave_Data.state;
-}
-
