@@ -58,23 +58,27 @@ TIM_HandleTypeDef htim1;
 /* USER CODE BEGIN PV */
 
 //Normal Op
-volatile uint8_t movement_state = 0;
-volatile int32_t timestamp      = 0; //global timer, updated only in Timer execution
-volatile uint8_t resumeFromStop = 0;
+volatile uint8_t movement_state = 0; //Valid if Infrared has input
+volatile int32_t timestamp      = 0; //global timer - seconds
+volatile uint8_t resumeFromStop = 0; //Handles re-enabling full operation
 
-//Buzzer Settings
+//Buzzer
 volatile uint8_t buzzerSettingsMode = 0;
 volatile uint16_t buzzerSafetyCheck = 0;
 
 uint32_t beeper = 3 * 60 * 60; //Three Hour Default
+uint8_t buzzerEnabled = 0;
+uint8_t disableBuzzer = 0;
 
-struct averages {
-  uint8_t average_iter;
-  uint16_t average_count;
-  uint32_t averages[64];
-};
 
-uint8_t oled_state              = 0;
+
+uint8_t oled_state = 0;
+
+
+
+char timestamp_str[6];
+char avg_str[6];
+char buzzer_str[6];
 
 struct session {
   uint8_t state;
@@ -82,9 +86,11 @@ struct session {
   int32_t ab_timestampe;
 };
 
-char timestamp_str[6];
-char avg_str[6];
-char buzzer_str[6];
+struct averages {
+  uint8_t average_iter;
+  uint16_t average_count;
+  uint32_t averages[64];
+};
 
 struct session session;
 struct averages averages;
@@ -179,7 +185,7 @@ void Display_SettingsScreen(uint8_t hours, uint8_t minutes, uint8_t selected_pos
     ssd1306_UpdateScreen();
 }
 
-
+//TIM set to 1Hz
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
   //Update global time
   timestamp++;
@@ -189,6 +195,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
       buzzerSettingsMode = 0;
       buzzerSafetyCheck = 0;
     }
+  }
+  if (timestamp >= beeper) {
+	  buzzerEnabled = 1;
   }
 }
 
@@ -229,6 +238,10 @@ void handle_movement() {
     movement_state = 1;
   }
 
+  if (buzzerEnabled && !disableBuzzer) {
+	  HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_SET);
+  }
+
   if (!oled_state) {
     ssd1306_SetDisplayOn(1);
     ssd1306_Fill(White);
@@ -262,6 +275,8 @@ void handle_absence() {
         session.ab_timestampe = 0;
         session.ab_tim_begun = 0;
         timestamp = 0;
+        buzzerEnabled = 0;
+        disableBuzzer = 0;
 
         //Store Average
         if (__flash_store(&averages.averages, averages.average_count, &beeper) != HAL_OK) {
@@ -401,16 +416,6 @@ int main(void)
     ssd1306_UpdateScreen();
     oled_state = 1;
   }
-
-  //Load Average 
-  
-
-  //Load Buffer Time
-  
-
-  //Set String used to be updated for display
-
-
   
   if (__load_fromFlash(&averages.averages, &beeper) == 0) {
 	  //Failed to Load Averages
@@ -437,9 +442,15 @@ int main(void)
     // Poll joystick for SELECT press to toggle settings mode
     JoystickDirection joy = Dechipher_JOYSTICK(Read_JOYSTICK());
     if (joy == JOY_SELECT) {
-        buzzerSafetyCheck = 0;
-        buzzerSettingsMode = !buzzerSettingsMode;
-        HAL_Delay(300);  // debounce — prevents immediate re-toggle
+    	if (buzzerEnabled) {
+    		buzzerEnabled = 0;
+    		disableBuzzer = 1;
+    		HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
+    	} else {
+			buzzerSafetyCheck = 0;
+			buzzerSettingsMode = !buzzerSettingsMode;
+			HAL_Delay(300);  // debounce — prevents immediate re-toggle
+    	}
     }
 
     if (buzzerSettingsMode) {
@@ -708,6 +719,16 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(Buzzer_GPIO_Port, Buzzer_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : Buzzer_Pin */
+  GPIO_InitStruct.Pin = Buzzer_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(Buzzer_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : INFRARED_Pin */
   GPIO_InitStruct.Pin = INFRARED_Pin;
