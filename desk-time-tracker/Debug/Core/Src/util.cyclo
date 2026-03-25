@@ -2,3 +2,4 @@
 ../Core/Src/util.c:42:6:getHoursMins	2
 ../Core/Src/util.c:32:6:timestampToChar	1
 ../Core/Src/util.c:56:10:hoursMinsToTimestamp	1
+../Core/Src/util.c:60:9:getActualAverage	4

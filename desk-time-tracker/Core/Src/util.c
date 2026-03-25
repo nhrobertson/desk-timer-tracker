@@ -56,3 +56,19 @@ void getHoursMins(uint8_t* hours8b, uint8_t* mins8b, uint32_t timestamp) {
 uint32_t hoursMinsToTimestamp(uint8_t hours, uint8_t minutes) {
   return (hours*60 + minutes) * 60;
 }
+
+int32_t getActualAverage(uint32_t* avg_arr, uint16_t* avg_count) {
+    int32_t avg = 0;
+    uint16_t count = 0;  // local count, don't touch the struct's counter
+
+    for (int i = 0; i < 64; ++i) {
+        if (avg_arr[i] != 0xFFFFFFFF && avg_arr[i] != 0x0) {
+            avg += avg_arr[i];
+            count++;
+        }
+    }
+
+    *avg_count = count;  // set once, don't increment
+    if (count == 0) return 0;
+    return avg / count;
+}

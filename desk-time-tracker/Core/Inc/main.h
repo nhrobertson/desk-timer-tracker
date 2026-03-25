@@ -36,7 +36,8 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-#define DMA_BUF_SIZE 256
+#define LAYOVER_TIME 180 //3 minutes
+#define ABS_TIME 720	 //7 minutes
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/

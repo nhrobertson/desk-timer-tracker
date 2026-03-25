@@ -83,7 +83,9 @@ char buzzer_str[6];
 struct session {
   uint8_t state;
   uint8_t ab_tim_begun;
-  int32_t ab_timestampe;
+  int32_t ab_timestamp;
+  uint8_t layover_tim_begun;
+  uint32_t layover_timestamp;
 };
 
 struct averages {
@@ -203,15 +205,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
   //Infrared Sensor
-  if (GPIO_Pin == GPIO_PIN_12) {
+  if (GPIO_Pin == INFRARED_Pin) {
+	movement_state = 1;
     //If coming from low power mode - wakeup
     if (resumeFromStop) {
-      SystemClock_Config();
       HAL_ResumeTick();
+      SystemClock_Config();
     }
-    movement_state = 1;
   }
-
 }
 
 uint16_t Read_JOYSTICK(void) {
@@ -232,7 +233,7 @@ JoystickDirection Dechipher_JOYSTICK(uint16_t adc_val) {
 void handle_movement() {
   session.state = 1;
   session.ab_tim_begun = 0;
-  session.ab_timestampe = 0;
+  session.ab_timestamp = 0;
 
   if (!movement_state) {
     movement_state = 1;
@@ -244,8 +245,7 @@ void handle_movement() {
 
   if (!oled_state) {
     ssd1306_SetDisplayOn(1);
-    ssd1306_Fill(White);
-    ssd1306_UpdateScreen();
+    Display_TimeScreen(timestamp_str, avg_str, buzzer_str);
     oled_state = 1;
   }
   
@@ -269,15 +269,31 @@ void handle_absence() {
   if (session.state) {
     //Begin Countdown
     if (session.ab_tim_begun) {
-      if (timestamp >= session.ab_timestampe + 360) {
+      if (timestamp >= session.ab_timestamp + ABS_TIME) {
         //5 Min Absensence, Enter Low Power Mode
         session.state = 0;
-        session.ab_timestampe = 0;
+        session.ab_timestamp = 0;
         session.ab_tim_begun = 0;
-        timestamp = 0;
+        session.layover_timestamp = 0;
         buzzerEnabled = 0;
         disableBuzzer = 0;
 
+        if (averages.average_count >= 64) {
+        	averages.averages[averages.average_iter] = timestamp - (ABS_TIME + LAYOVER_TIME);
+        	averages.average_iter++;
+        	if (averages.average_iter > 63) {
+        		averages.average_iter = 0;
+        	}
+        } else {
+        	if (averages.average_count == 0) {
+            	averages.averages[averages.average_count] = timestamp - (ABS_TIME + LAYOVER_TIME);
+        	} else {
+            	averages.averages[averages.average_count - 1] = timestamp - (ABS_TIME + LAYOVER_TIME);
+        	}
+
+        }
+
+        timestamp = 0;
         //Store Average
         if (__flash_store(&averages.averages, averages.average_count, &beeper) != HAL_OK) {
           //Broken
@@ -286,13 +302,12 @@ void handle_absence() {
 
         //Enter Low Power Mode
         resumeFromStop = 1;
-        HAL_SuspendTick();
-        HAL_PWR_EnterSTOPMode(PWR_MAINREGULATOR_ON, PWR_STOPENTRY_WFI);
-        resumeFromStop = 0;
+        //HAL_SuspendTick();
+        //HAL_PWR_EnterSTOPMode(PWR_MAINREGULATOR_ON, PWR_STOPENTRY_WFI);
       }
     } else {
       session.ab_tim_begun = 1;
-      session.ab_timestampe = timestamp;
+      session.ab_timestamp = timestamp;
     }
   }
 }
@@ -407,24 +422,28 @@ int main(void)
   //Initalized in MX_TIM1_Init
   HAL_TIM_Base_Start_IT(&htim1);
 
+  if (__load_fromFlash(&averages.averages, &beeper) == 0) {
+	  //Failed to Load Averages
+	  sprintf(avg_str, "00:00");
+	  sprintf(buzzer_str, "00:00");
+	  sprintf(timestamp_str, "00:00");
+  } else {
+
+	  int32_t actualAverage = getActualAverage(&averages.averages, &averages.average_count);
+	  timestampToChar(avg_str, actualAverage);
+	  timestampToChar(buzzer_str, beeper);
+	  sprintf(timestamp_str, "00:00");
+  }
+
   //Turn On Screen
   ssd1306_Init();
 
   if (!oled_state) {
     ssd1306_SetDisplayOn(1);
-    ssd1306_Fill(White);
-    ssd1306_UpdateScreen();
+    Display_TimeScreen(timestamp_str, avg_str, buzzer_str);
     oled_state = 1;
   }
   
-  if (__load_fromFlash(&averages.averages, &beeper) == 0) {
-	  //Failed to Load Averages
-	  sprintf(avg_str, "00:00");
-	  sprintf(buzzer_str, "00:00");
-  } else {
-	  timestampToChar(avg_str, averages.averages[0]);
-	  timestampToChar(buzzer_str, beeper);
-  }
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -435,7 +454,22 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     //Simulate State until Infared Sensor comes in
-    movement_state = 1;
+	if (HAL_GPIO_ReadPin(INFRARED_GPIO_Port, INFRARED_Pin) && !resumeFromStop) {
+		movement_state = 1;
+		session.layover_timestamp = timestamp;
+	} else {
+		if (timestamp >= session.layover_timestamp + LAYOVER_TIME) {
+			movement_state = 0;
+			while(resumeFromStop) {
+				if (HAL_GPIO_ReadPin(INFRARED_GPIO_Port, INFRARED_Pin)) {
+					resumeFromStop = 0;
+					movement_state = 1;
+					session.layover_timestamp = timestamp;
+				}
+			}
+		}
+	}
+
 
     oled_state = ssd1306_GetDisplayOn();
 
